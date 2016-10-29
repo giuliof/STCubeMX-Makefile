@@ -52,7 +52,7 @@ CFLAGS += -D$(CPU_LINE_UC)
 ## Linker options
 
 # tell ld which linker file to use
-LFLAGS  = -T./SW4STM32/$(PROJ_NAME)/STM32F411RETx_FLASH.ld
+LFLAGS  = -T./SW4STM32/$(PROJ_NAME)/$(CPU_NAME)_FLASH.ld
 
 
 ######################################################################
@@ -106,11 +106,14 @@ SRCS  += $(CPU_FAMILY_LC)_hal_rcc.c
 SRCS  += $(CPU_FAMILY_LC)_hal_msp.c
 SRCS  += $(CPU_FAMILY_LC)_hal_pwr.c
 SRCS  += $(CPU_FAMILY_LC)_hal_cortex.c
+# example of other files...
+#SRCS  += $(CPU_FAMILY_LC)_hal_rtc.c
+#SRCS  += $(CPU_FAMILY_LC)_hal_usart.c
 
 # Startup file written by ST
 # The assembly code in this file is the first one to be
 # executed. Normally you do not change this file.
-ASRC = startup_$(CPU_NAME)_FLASH.s
+ASRC = startup_$(CPU_LINE_LC).s
 
 # in case we have to many sources and don't want
 # to compile all sources every time
