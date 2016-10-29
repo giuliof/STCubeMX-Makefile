@@ -1,26 +1,29 @@
 # Name of the binaries.
-PROJ_NAME=stm32f4-template
+PROJ_NAME=stm32-template
 
 ######################################################################
 #                         SETUP TOOLS                                #
 ######################################################################
 
-# This is the path to the toolchain
-# (we don't put our toolchain on $PATH to keep the system clean)
-TOOLS_DIR = /opt/gcc-arm-embedded/gcc-arm-none-eabi-5_2-2015q4/bin
+# Board/CPU info
+CPU_FAMILY_UC = STM32F4xx
+CPU_FAMILY_LC = stm32f4xx
+CPU_LINE_UC   = STM32F411xE
+CPU_LINE_LC   = stm32f411xe
+CPU_NAME      = STM32F411RETx
 
 # The tools we use
-CC      = $(TOOLS_DIR)/arm-none-eabi-gcc
-OBJCOPY = $(TOOLS_DIR)/arm-none-eabi-objcopy
-GDB     = $(TOOLS_DIR)/arm-none-eabi-gdb
-AS      = $(TOOLS_DIR)/arm-none-eabi-as
+CC      = arm-none-eabi-gcc
+OBJCOPY = arm-none-eabi-objcopy
+GDB     = arm-none-eabi-gdb
+AS      = arm-none-eabi-as
 
 ## Preprocessor options
 
 # directories to be searched for header files
 INCLUDE = $(addprefix -I,$(INC_DIRS))
 
-# #defines needed when working with the STM library
+### defines needed when working with the STM library
 DEFS    = -DUSE_STDPERIPH_DRIVER
 # if you use the following option, you must implement the function
 #    assert_failed(uint8_t* file, uint32_t line)
@@ -38,36 +41,33 @@ AFLAGS += -mfpu=fpv4-sp-d16
 
 ## Compiler options
 
-CFLAGS  = -ggdb
+CFLAGS  = --specs=nosys.specs
+CFLAGS += -ggdb
 # please do not optimize anything because we are debugging
 CFLAGS += -O0
 CFLAGS += -Wall -Wextra -Warray-bounds
 CFLAGS += $(AFLAGS)
+CFLAGS += -D$(CPU_LINE_UC)
 
 ## Linker options
 
 # tell ld which linker file to use
-# (this file is in the current directory)
-LFLAGS  = -Tstm32_flash.ld
+LFLAGS  = -T./SW4STM32/$(PROJ_NAME)/STM32F411RETx_FLASH.ld
 
 
 ######################################################################
 #                         SETUP SOURCES                              #
 ######################################################################
 
-# This is the directory containing the firmware package,
-# the unzipped folder downloaded from here:
-# http://www.st.com/web/en/catalog/tools/PF257904
-STM_ROOT         =../STM32F4-Discovery_FW_V1.1.0
-
 # This is where the source files are located,
 # which are not in the current directory
 # (the sources of the standard peripheral library, which we use)
 # see also "info:/make/Selective Search" in Konqueror
-MY_SRC_DIR       = ./src
-STM_SRC_DIR      = $(STM_ROOT)/Libraries/STM32F4xx_StdPeriph_Driver/src
-STM_SRC_DIR     += $(STM_ROOT)/Utilities/STM32F4-Discovery
-STM_STARTUP_DIR += $(STM_ROOT)/Libraries/CMSIS/ST/STM32F4xx/Source/Templates/TrueSTUDIO
+MY_SRC_DIR       = ./Src
+STM_SRC_DIR      = ./Drivers/CMSIS/Device/ST/$(CPU_FAMILY_UC)/Source/Templates/gcc
+STM_SRC_DIR     += ./Drivers/CMSIS/Device/ST/$(CPU_FAMILY_UC)/Source/Templates
+STM_SRC_DIR     += ./Drivers/$(CPU_FAMILY_UC)_HAL_Driver/Src/
+STM_STARTUP_DIR += ./Drivers/CMSIS/Device/ST/$(CPU_FAMILY_UC)/Source/Templates/gcc/
 
 # Tell make to look in that folder if it cannot find a source
 # in the current directory
@@ -81,29 +81,36 @@ vpath %.s $(STM_STARTUP_DIR)
 ################################################################################
 
 # The header files we use are located here
-INC_DIRS  = ./headers
-INC_DIRS += $(STM_ROOT)/Utilities/STM32F4-Discovery
-INC_DIRS += $(STM_ROOT)/Libraries/CMSIS/Include
-INC_DIRS += $(STM_ROOT)/Libraries/CMSIS/ST/STM32F4xx/Include
-INC_DIRS += $(STM_ROOT)/Libraries/STM32F4xx_StdPeriph_Driver/inc
+INC_DIRS  = ./Inc
+INC_DIRS += ./Drivers/CMSIS/Device/ST/$(CPU_FAMILY_UC)/Include/
+INC_DIRS += ./Drivers/CMSIS/Include/
+INC_DIRS += ./Drivers/$(CPU_FAMILY_UC)_HAL_Driver/Inc/
 
 
 ################################################################################
 #                   SOURCE FILES TO COMPILE                                    #
 ################################################################################
 
-# My source files
+# My source file
 SRCS   = main.c
 
-# Contains initialisation code and must be compiled into
-# our project. This file is in the current directory and
-# was writen by ST.
-SRCS  += system_stm32f4xx.c
+# Files containing initialisation code and must be compiled into
+# our project.
+# Some files are in the same folder of main source file
+SRCS  += $(CPU_FAMILY_LC)_it.c
+SRCS  += $(CPU_FAMILY_LC)_hal.c
+# others are produced by STCubeMX (or can be downloaded from ST website)
+SRCS  += system_$(CPU_FAMILY_LC).c
+SRCS  += $(CPU_FAMILY_LC)_hal_gpio.c
+SRCS  += $(CPU_FAMILY_LC)_hal_rcc.c
+SRCS  += $(CPU_FAMILY_LC)_hal_msp.c
+SRCS  += $(CPU_FAMILY_LC)_hal_pwr.c
+SRCS  += $(CPU_FAMILY_LC)_hal_cortex.c
 
 # Startup file written by ST
 # The assembly code in this file is the first one to be
 # executed. Normally you do not change this file.
-ASRC = startup_stm32f4xx.s
+ASRC = startup_$(CPU_NAME)_FLASH.s
 
 # in case we have to many sources and don't want
 # to compile all sources every time
@@ -121,6 +128,7 @@ OUT_DIR = ./out
 .PHONY: all
 
 all: $(PROJ_NAME).elf
+	@echo -e "\nDone!"
 
 %.o : %.c
 	@echo "[Compiling  ]  $^"
@@ -147,4 +155,5 @@ flash: all
 
 debug:
 # before you start gdb, you must start st-util
-	$(GDB) -tui $(OUT_DIR)/$(PROJ_NAME).elf
+	@read -p "start st-util, then press enter..." -n1 -s
+	$(GDB) --eval-command="target remote localhost:4242" -tui $(OUT_DIR)/$(PROJ_NAME).elf
